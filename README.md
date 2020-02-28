@@ -8,7 +8,7 @@ you might do with this model, using an imaginary server library:
 server = do
   model <- inc massiveServerState
   modelA <- imap convenienceA model
-  modelB <- imao convenienceB model
+  modelB <- imap convenienceB model
   endpoints [ endpointA modelA, endpointB modelB ] 
 ```
 
