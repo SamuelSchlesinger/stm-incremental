@@ -1,0 +1,6 @@
+.stack-work/
+.*.swp
+tags
+*.cabal
+notes
+dist-newstyle/
