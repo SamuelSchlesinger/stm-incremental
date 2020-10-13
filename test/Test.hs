@@ -12,49 +12,82 @@ import Test.Hspec
 
 main :: IO ()
 main = hspec . describe "stm-incremental" $ do
-  it "Binds alright" do
+  it "nests combines right" do
+    (a, b, c, d, e, f, g) <- atomically do
+      a <- incremental "X"
+      b <- incremental "O"
+      c <- incremental "Z"
+      d <- combine (<>) a c
+      e <- combine (<>) c b
+      f <- combine (<>) d e
+      g <- combine (<>) a f
+      pure (a, b, c, d, e, f, g)
+    let recv = atomically ((,,,,,,) <$> observe a <*> observe b <*> observe c <*> observe d <*> observe e <*> observe f <*> observe g)
+    recv `shouldReturn` ("X", "O", "Z", "XZ", "ZO", "XZZO", "XXZZO")
+    atomically (set a "A")
+    recv `shouldReturn` ("A", "O", "Z", "AZ", "ZO", "AZZO", "AAZZO")
+    atomically (set b "D")
+    recv `shouldReturn` ("A", "D", "Z", "AZ", "ZD", "AZZD", "AAZZD")
+    atomically (set c "P")
+    recv `shouldReturn` ("A", "D", "P", "AP", "PD", "APPD", "AAPPD")
+  it "nests maps right" do
+    (a, b, c, d) <- atomically do
+      a <- incremental 1
+      b <- map (+ 1) a
+      c <- map (+ 1) b
+      d <- map (+ 1) c
+      pure (a, b, c, d)
+    let recv = atomically ((,,,) <$> observe a <*> observe b <*> observe c <*> observe d)
+    recv `shouldReturn` (1, 2, 3, 4)
+    atomically (set a 101)
+    recv `shouldReturn` (101, 102, 103, 104) 
+  it "binds alright" do
     (x, y, z, a) <- atomically do
       x <- incremental 100
       y <- incremental 200
       z <- incremental True
       a <- choose z (bool x y)
       pure (x, y, z, a)
-    atomically ((,,,) <$> observe x <*> observe y <*> observe z <*> observe a) `shouldReturn` (100, 200, True, 200)
+    let recv = atomically ((,,,) <$> observe x <*> observe y <*> observe z <*> observe a)
+    recv `shouldReturn` (100, 200, True, 200)
     atomically (set x 0)
-    atomically ((,,,) <$> observe x <*> observe y <*> observe z <*> observe a) `shouldReturn` (0, 200, True, 200)
+    recv `shouldReturn` (0, 200, True, 200)
     atomically (set y 100)
-    atomically ((,,,) <$> observe x <*> observe y <*> observe z <*> observe a) `shouldReturn` (0, 100, True, 100)
+    recv `shouldReturn` (0, 100, True, 100)
     atomically (set z False)
-    atomically ((,,,) <$> observe x <*> observe y <*> observe z <*> observe a) `shouldReturn` (0, 100, False, 0)
+    recv `shouldReturn` (0, 100, False, 0)
     atomically (set x 1000)
-    atomically ((,,,) <$> observe x <*> observe y <*> observe z <*> observe a) `shouldReturn` (1000, 100, False, 1000)
+    recv `shouldReturn` (1000, 100, False, 1000)
     atomically (set y 500)
-    atomically ((,,,) <$> observe x <*> observe y <*> observe z <*> observe a) `shouldReturn` (1000, 500, False, 1000) 
+    recv `shouldReturn` (1000, 500, False, 1000) 
     atomically (set z True)
-    atomically ((,,,) <$> observe x <*> observe y <*> observe z <*> observe a) `shouldReturn` (1000, 500, True, 500)
+    recv `shouldReturn` (1000, 500, True, 500)
   it "maps and combines alright" do
     (x, y, z) <- atomically do
       x <- incremental 100
       y <- map (+ 10) x
       z <- combine (+) x y
       pure (x, y, z)
-    atomically ((,,) <$> observe x <*> observe y <*> observe z) `shouldReturn` (100, 110, 210)
+    let recv = atomically ((,,) <$> observe x <*> observe y <*> observe z)
+    recv `shouldReturn` (100, 110, 210)
     atomically (set x 10)
-    atomically ((,,) <$> observe x <*> observe y <*> observe z) `shouldReturn` (10, 20, 30) 
+    recv `shouldReturn` (10, 20, 30) 
   it "combines alright" do
     (x, y, z) <- atomically do
       salutation <- incremental "Heya"
       name <- incremental "Samuel"
       greeting <- combine (\s n -> s <> ", " <> n) salutation name
       pure (salutation, name, greeting)
-    atomically ((,,) <$> observe x <*> observe y <*> observe z) `shouldReturn` ("Heya", "Samuel", "Heya, Samuel")
+    let recv = atomically ((,,) <$> observe x <*> observe y <*> observe z)
+    recv `shouldReturn` ("Heya", "Samuel", "Heya, Samuel")
     atomically (set x "Hello")
-    atomically ((,,) <$> observe x <*> observe y <*> observe z) `shouldReturn` ("Hello", "Samuel", "Hello, Samuel")
+    recv `shouldReturn` ("Hello", "Samuel", "Hello, Samuel")
   it "maps alright" do
     (x, y) <- atomically do
       x <- incremental "Hello, world"
       y <- map ((<> "!") . fmap toUpper) x
       pure (x, y)
-    atomically ((,) <$> observe x <*> observe y) `shouldReturn` ("Hello, world", "HELLO, WORLD!")
+    let recv = atomically ((,) <$> observe x <*> observe y) 
+    recv `shouldReturn` ("Hello, world", "HELLO, WORLD!")
     atomically (set x "Wot, m8?")
-    atomically ((,) <$> observe x <*> observe y) `shouldReturn` ("Wot, m8?", "WOT, M8?!")
+    recv `shouldReturn` ("Wot, m8?", "WOT, M8?!")

@@ -86,11 +86,15 @@ incremental a = do
 map :: (a -> b) -> Incremental m a -> STM (Incremental 'Immutable b)
 map f (Incremental ref updateRef) = do
   newRef <- readTVar ref >>= newTVar . f
+  newUpdateRef <- newTVar (const (pure ()))
   update <- readTVar updateRef
   writeTVar updateRef \a -> do
     update a
-    writeTVar newRef (f a)
-  Incremental newRef <$> newTVar (const (pure ()))
+    let b = f a
+    writeTVar newRef b
+    newUpdate <- readTVar newUpdateRef
+    newUpdate b
+  pure (Incremental newRef newUpdateRef)
 
 -- | Sets the value of a mutable incremental computation.
 set :: Incremental 'Mutable a -> a -> STM ()
@@ -112,17 +116,24 @@ combine f (Incremental ref updateRef) (Incremental ref' updateRef') = do
   a <- readTVar ref
   b <- readTVar ref'
   newRef <- newTVar (f a b)
+  newUpdateRef <- newTVar (const (pure ()))
   update <- readTVar updateRef
   update' <- readTVar updateRef'
   writeTVar updateRef \a -> do
     update a
     b <- readTVar ref'
-    writeTVar newRef (f a b)
+    let c = f a b
+    writeTVar newRef c
+    newUpdate <- readTVar newUpdateRef
+    newUpdate c
   writeTVar updateRef' \b -> do
     update' b
     a <- readTVar ref
-    writeTVar newRef (f a b)
-  Incremental newRef <$> newTVar (const (pure ()))
+    let c = f a b
+    writeTVar newRef c
+    newUpdate <- readTVar newUpdateRef
+    newUpdate c
+  pure (Incremental newRef newUpdateRef)
 
 -- | Chooses an incremental computation depending on the value inside of another
 -- one. When using 'map' and 'combine', you are constructing
@@ -134,20 +145,25 @@ choose (Incremental ref updateRef) f = do
   a <- readTVar ref
   let Incremental ref' updateRef' = f a
   newRef <- readTVar ref' >>= newTVar
+  newUpdateRef <- newTVar (const (pure ()))
   update' <- readTVar updateRef'
   update <- readTVar updateRef
   updateFromWhichRef <- newTVar (ref', [ref'])
   writeTVar updateRef' \b -> do
     update' b
     (tvar, _tvars) <- readTVar updateFromWhichRef
-    if tvar == ref' then writeTVar newRef b
+    if tvar == ref' then do
+      writeTVar newRef b
+      newUpdate <- readTVar newUpdateRef
+      newUpdate b
     else pure ()
   writeTVar updateRef \a -> do
     update a
     (currentRef, pastRefs) <- readTVar updateFromWhichRef
     let Incremental ref'' updateRef'' = f a
     if ref'' /= currentRef then do
-      readTVar ref'' >>= writeTVar newRef
+      b <- readTVar ref''
+      writeTVar newRef b
       if not (ref'' `elem` pastRefs) then do
         update'' <- readTVar updateRef''
         writeTVar updateRef'' \b -> do
@@ -158,5 +174,7 @@ choose (Incremental ref updateRef) f = do
         writeTVar updateFromWhichRef (ref'', ref'' : pastRefs)
       else
         pure ()
+      newUpdate <- readTVar newUpdateRef
+      newUpdate b
     else pure ()
-  Incremental newRef <$> newTVar (const (pure ()))
+  pure (Incremental newRef newUpdateRef)
