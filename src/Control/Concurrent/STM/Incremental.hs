@@ -128,4 +128,3 @@ choose (Incremental read write ref updateRef) f = do
         pure ()
     else pure ()
   Incremental (readTVar ref) (writeTVar ref) ref <$> newTVar (const (pure ()))
-
