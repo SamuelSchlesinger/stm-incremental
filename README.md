@@ -15,7 +15,7 @@ main = do
   -- Will print "Hello, Samuel"
   atomically (observe greeting) >>= print
   atomically (set salutation "Hiya")
-  -- Will print "Hiya, Sam"
+  -- Will print "Hiya, Samuel"
   atomically (observe greeting) >>= print
 ```
 
