@@ -8,8 +8,8 @@ import Control.Concurrent.STM.Incremental
 
 main = do
   (salutation, name, greeting) <- atomically do
-    salutation <- atomically (incremental "Hello")
-    name <- atomically (incremental "Samuel")
+    salutation <- incremental "Hello"
+    name <- incremental "Samuel"
     greeting <- combine (\s n -> s <> ", " n) salutation name
     pure (salutation, name, greeting)
   -- Will print "Hello, Samuel"
