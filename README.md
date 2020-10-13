@@ -30,8 +30,14 @@ depending on live values in the incremental computation. In other words, this
 allows you to have dynamic dependencies, whereas the former two functions only
 allowed you to have static dependencies.
 
-The use case for this library is when you have a data structure you want to
-maintain based on some input data, but it is expensive to compute in full, and
-you will not be changing it extremely frequently. If you can factor your
-dependencies carefully, perhaps changing one piece of your computation will
+The `choose` combinator is the most computationally expensive, requiring in the
+worst case time proportional to the size of the image of the choice function
+passed in. That being said, it can be made logarithmic in the size of the image
+in a not-so-difficult way, but it must be noted that it must retain space
+proportional to the entire image in the heap in the worst case. In general,
+I would argue that this does not typically come up in the use case that I am
+interested in. The use case for this library is when you have a data structure
+you want to maintain based on some input data, but it is expensive to compute
+in full, and you will not be changing it extremely frequently. If you can factor
+your dependencies carefully, perhaps changing one piece of your computation will
 not require substantial work to incrementally compile the rest.
