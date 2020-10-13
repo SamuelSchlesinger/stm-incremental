@@ -13,9 +13,9 @@ Portability: POSIX, Windows
 module Control.Concurrent.STM.Incremental
 ( Mutability(Immutable, Mutable)
 , Incremental
+, incremental
 , observe
 , set
-, incremental
 , map
 , combine
 , choose
@@ -30,8 +30,8 @@ import Control.Concurrent.STM
 -- us to modify leaf nodes of computational graphs as to avoid inconsistent states.
 data Mutability = Immutable | Mutable
 
--- | An incremental computation, cached unless something it depends on is
--- written to.
+-- | An incremental computation, only updated when one of its dependencies
+-- is.
 data Incremental (mutability :: Mutability) a = Incremental
   { read :: STM a
   , write :: a -> STM ()
