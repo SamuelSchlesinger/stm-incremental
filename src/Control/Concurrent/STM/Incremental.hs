@@ -1,6 +1,15 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE BlockArguments #-}
+{- |
+Module: Control.Concurrent.STM.Incremental
+Description: A set of combinators for constructing and observing incremental computations.
+Copyright: (c) Samuel Schlesinger 2020
+License: MIT
+Maintainer: sgschlesinger@gmail.com
+Stability: experimental
+Portability: POSIX, Windows
+-}
 module Control.Concurrent.STM.Incremental
 ( Mutability(Immutable, Mutable)
 , Incremental
