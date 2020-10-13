@@ -1,43 +1,37 @@
 # stm-incremental
 
-This library is a simple interface to incremental computation using Haskell's
-software transactional memory system. Here is a snippet of the sort of thing
-you might do with this model, using an imaginary server library:
+This library is meant to expose an interface for incremental computation
+using software transactional memory in Haskell.
 
 ```haskell
-server = do
-  model <- inc massiveServerState
-  modelA <- imap convenienceA model
-  modelB <- imap convenienceB model
-  endpoints [ endpointA modelA, endpointB modelB ] 
+import Control.Concurrent.STM.Incremental
+
+main = do
+  (salutation, name, greeting) <- atomically do
+    salutation <- atomically (incremental "Hello")
+    name <- atomically (incremental "Samuel")
+    greeting <- combine (\s n -> s <> ", " n) salutation name
+    pure (salutation, name, greeting)
+  -- Will print "Hello, Samuel"
+  atomically (observe greeting) >>= print
+  atomically (set salutation "Hiya")
+  -- Will print "Hiya, Sam"
+  atomically (observe greeting) >>= print
 ```
 
-Here, we are replicating a very common pattern in Haskell, modifying a global
-state for local consumption. The difference is, typically you would just read
-the global state and pass it through `convenienceA` and `convenienceB`, but
-here these are only ever updated when the global state is changed, and they
-can otherwise be freely read.
+There are three operations, `map`, `combine`, and `choose`. They sort of
+correspond to the operations of `fmap`, `liftA2`, and `(>>=)`, but not exactly,
+and it isn't really worth belaboring that point if it isn't clear. `map` allows
+you to construct an incremental computation depending on one other, which only
+ever gets updated when this single dependency does. `combine` allows you to
+construct an incremental computation depending on two others, which gets updated
+whenever _either_ does. `choose` allows you to switch your dependency structure
+depending on live values in the incremental computation. In other words, this
+allows you to have dynamic dependencies, whereas the former two functions only
+allowed you to have static dependencies.
 
-Okay, well that's not so amazing, as we can just include the models for `A`
-and `B` in the global model and this will get around the contention involved
-in reading different `TVar`s. Well, what if we took a different tact? What if
-we defined our entire application context as a number of `Incremental` values
-and then merged them together? Well, we can! That's the purpose of `iliftA2`:
-
-```haskell
-server = do
-  bit1 <- inc smallBit1
-  forkIO $ forever $ threadDelay 10000 >> (pollBit1 >>= imodify bit1)
-  bit2 <- inc smallBit2
-  forkIO $ forever $ threadDelay 10000 >> (pollBit2 >>= imodify bit2)
-  bit3 <- inc smallBit3
-  forkIO $ forever $ threadDelay 10000 >> (pollBit3 >>= imodify bit3)
-  modelA <- iliftA2 combine1And2 bit1 bit2
-  modelB <- iliftA2 combine2And3 bit2 bit3
-  endpoints [ endpointA modelA, endpointB modelB ]
-```
-
-Above, we show some code that polls various bits of the application state,
-updating the in-memory representation, and the models are now constructed
-via `iliftA2`, and will only be updated when an `Incremental` they were built
-from is updated.
+The use case for this library is when you have a data structure you want to
+maintain based on some input data, but it is expensive to compute in full, and
+you will not be changing it extremely frequently. If you can factor your
+dependencies carefully, perhaps changing one piece of your computation will
+not require substantial work to incrementally compile the rest.
