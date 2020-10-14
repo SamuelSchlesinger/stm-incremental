@@ -14,7 +14,7 @@ import Test.Hspec
 main :: IO ()
 main = hspec . describe "stm-incremental" $ do
   it "nests binds right" do
-    (a, b, c, d, e, f, g) <- atomically do
+    (a, b, c, d, e, f, g, h) <- atomically do
       a <- incremental "a"
       b <- incremental "b"
       c <- incremental True
@@ -24,15 +24,18 @@ main = hspec . describe "stm-incremental" $ do
       g <- choose f \case
         "a" -> a
         "b" -> b
-      pure (a, b, c, d, e, f, g)
-    let recv = atomically ((,,,,,,) <$> observe a <*> observe b <*> observe c <*> observe d <*> observe e <*> observe f <*> observe g)
-    recv `shouldReturn` ("a", "b", True, "b", False, "b", "b")
+      h <- choose g \case
+        "a" -> immutable c
+        "b" -> e
+      pure (a, b, c, d, e, f, g, h)
+    let recv = atomically ((,,,,,,,) <$> observe a <*> observe b <*> observe c <*> observe d <*> observe e <*> observe f <*> observe g <*> observe h)
+    recv `shouldReturn` ("a", "b", True, "b", False, "b", "b", False)
     atomically (set b "a")
-    recv `shouldReturn` ("a", "a", True, "a", True, "a", "a")
+    recv `shouldReturn` ("a", "a", True, "a", True, "a", "a", True)
     atomically (set c False)
-    recv `shouldReturn` ("a", "a", False, "a", True, "a", "a")
+    recv `shouldReturn` ("a", "a", False, "a", True, "a", "a", False)
     atomically (set a "b")
-    recv `shouldReturn` ("b", "a", False, "b", False, "a", "b")
+    recv `shouldReturn` ("b", "a", False, "b", False, "a", "b", False)
       
   it "nests combines right" do
     (a, b, c, d, e, f, g) <- atomically do
