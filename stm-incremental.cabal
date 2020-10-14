@@ -21,7 +21,7 @@ source-repository head
 
 library
   exposed-modules:     Control.Concurrent.STM.Incremental
-  other-extensions:    KindSignatures, DataKinds, BlockArguments
+  other-extensions:    KindSignatures, DataKinds, BlockArguments, RecordWildCards
   build-depends:       base >=4.12 && <4.16,
                        stm >=2.1
   hs-source-dirs:      src
