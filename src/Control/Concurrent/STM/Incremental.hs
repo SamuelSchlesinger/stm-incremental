@@ -51,10 +51,15 @@ module Control.Concurrent.STM.Incremental
 , incremental
 , observe
 , set
+, setEq
 , map
+, mapEq
 , combine
+, combineEq
 , choose
+, chooseEq
 , immutable
+, onUpdate
 ) where
 
 import Prelude hiding (read, map)
@@ -98,12 +103,45 @@ map f (Incremental ref updateRef) = do
     newUpdate b
   pure (Incremental newRef newUpdateRef)
 
+-- | Create an incrementally mapped computation, producing an immutable
+-- incremental computation that will always contain the function mapped
+-- over the value inside of the original computation.
+mapEq :: Eq b => (a -> b) -> Incremental m a -> STM (Incremental 'Immutable b)
+mapEq f (Incremental ref updateRef) = do
+  newRef <- readTVar ref >>= newTVar . f
+  newUpdateRef <- newTVar (const (pure ()))
+  update <- readTVar updateRef
+  writeTVar updateRef \a -> do
+    update a
+    b <- readTVar newRef
+    let b' = f a
+    if b == b' then do
+      pure ()
+    else do
+      writeTVar newRef b'
+      newUpdate <- readTVar newUpdateRef
+      newUpdate b'
+  pure (Incremental newRef newUpdateRef)
+
 -- | Sets the value of a mutable incremental computation.
 set :: Incremental 'Mutable a -> a -> STM ()
 set incr a = do
   writeTVar (ref incr) a
   update <- readTVar (updateRef incr)
   update a
+
+-- | Sets the value of a mutable incremental computation, with the added
+-- optimization that if the value is equal to the old one, this does not
+-- proceed with the update.
+setEq :: Eq a => Incremental 'Mutable a -> a -> STM ()
+setEq incr a = do
+  a' <- readTVar (ref incr)
+  if a' /= a then do
+    writeTVar (ref incr) a
+    update <- readTVar (updateRef incr)
+    update a
+  else do
+    pure ()
 
 -- | Observes the present value of any incremental computation.
 observe :: Incremental m a -> STM a
@@ -135,6 +173,41 @@ combine f (Incremental ref updateRef) (Incremental ref' updateRef') = do
     writeTVar newRef c
     newUpdate <- readTVar newUpdateRef
     newUpdate c
+  pure (Incremental newRef newUpdateRef)
+
+-- | Like 'combine', but with the added optimization that if the value
+-- computed is equal to the old one, it will not propagate the update
+-- through any further.
+combineEq :: Eq c => (a -> b -> c) -> Incremental m a -> Incremental m' b -> STM (Incremental 'Immutable c)
+combineEq f (Incremental ref updateRef) (Incremental ref' updateRef') = do
+  a <- readTVar ref
+  b <- readTVar ref'
+  newRef <- newTVar (f a b)
+  newUpdateRef <- newTVar (const (pure ()))
+  update <- readTVar updateRef
+  update' <- readTVar updateRef'
+  writeTVar updateRef \a -> do
+    update a
+    b <- readTVar ref'
+    c <- readTVar newRef
+    let c' = f a b
+    if c == c' then do
+      pure ()
+    else do
+      writeTVar newRef c'
+      newUpdate <- readTVar newUpdateRef
+      newUpdate c'
+  writeTVar updateRef' \b -> do
+    update' b
+    a <- readTVar ref
+    c <- readTVar newRef
+    let c' = f a b
+    if c == c' then do
+      pure ()
+    else do
+      writeTVar newRef c'
+      newUpdate <- readTVar newUpdateRef
+      newUpdate c'
   pure (Incremental newRef newUpdateRef)
 
 -- | Sometimes, we need to consider an @'Incremental' 'Mutable'@ in
@@ -188,3 +261,65 @@ choose (Incremental ref updateRef) f = do
       else writeTVar updateFromWhichRef (ref'', pastRefs)
     else pure ()
   pure (Incremental newRef newUpdateRef)
+
+-- | Like 'choose', but with the added optimization that we do not
+-- propagate changes when we don't have to in a similar way to 'setEq',
+-- 'combineEq', and 'mapEq'.
+chooseEq :: Eq b => Incremental m' a -> (a -> Incremental m b) -> STM (Incremental 'Immutable b)
+chooseEq (Incremental ref updateRef) f = do
+  a <- readTVar ref
+  let Incremental ref' updateRef' = f a
+  newRef <- readTVar ref' >>= newTVar
+  newUpdateRef <- newTVar (const (pure ()))
+  update' <- readTVar updateRef'
+  update <- readTVar updateRef
+  updateFromWhichRef <- newTVar (ref', [ref'])
+  writeTVar updateRef' \b -> do
+    update' b
+    (tvar, _tvars) <- readTVar updateFromWhichRef
+    if tvar == ref' then do
+      b' <- readTVar newRef
+      if b' == b then
+        pure ()
+      else do
+        writeTVar newRef b
+        newUpdate <- readTVar newUpdateRef
+        newUpdate b
+    else pure ()
+  writeTVar updateRef \a -> do
+    update a
+    (currentRef, pastRefs) <- readTVar updateFromWhichRef
+    let Incremental ref'' updateRef'' = f a
+    if ref'' /= currentRef then do
+      b <- readTVar ref''
+      writeTVar newRef b
+      newUpdate <- readTVar newUpdateRef
+      newUpdate b
+      if not (ref'' `elem` pastRefs) then do
+        update'' <- readTVar updateRef''
+        writeTVar updateRef'' \b -> do
+          update'' b
+          (tvar, _tvars) <- readTVar updateFromWhichRef
+          if tvar == ref'' then do
+            b' <- readTVar newRef
+            if b' == b then do
+              pure ()
+            else do
+              writeTVar newRef b
+              newUpdate <- readTVar newUpdateRef
+              newUpdate b
+          else pure ()
+        writeTVar updateFromWhichRef (ref'', ref'' : pastRefs)
+      else writeTVar updateFromWhichRef (ref'', pastRefs)
+    else pure ()
+  pure (Incremental newRef newUpdateRef)
+
+-- | Add monitoring hooks which can do arbitrary actions in 'STM' with the
+-- changed value whenever this 'Incremental' is updated.
+onUpdate :: Incremental m b -> (b -> STM ()) -> STM ()
+onUpdate (Incremental _ref updateRef) monitoring = do
+  update <- readTVar updateRef
+  writeTVar updateRef \b -> do
+    update b
+    monitoring b
+    
