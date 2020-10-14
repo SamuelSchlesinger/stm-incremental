@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BlockArguments #-}
 module Main where
 
@@ -12,6 +13,27 @@ import Test.Hspec
 
 main :: IO ()
 main = hspec . describe "stm-incremental" $ do
+  it "nests binds right" do
+    (a, b, c, d, e, f, g) <- atomically do
+      a <- incremental "a"
+      b <- incremental "b"
+      c <- incremental True
+      d <- choose c (bool a b)
+      e <- map (== "a") d
+      f <- choose e (bool (immutable b) d)
+      g <- choose f \case
+        "a" -> a
+        "b" -> b
+      pure (a, b, c, d, e, f, g)
+    let recv = atomically ((,,,,,,) <$> observe a <*> observe b <*> observe c <*> observe d <*> observe e <*> observe f <*> observe g)
+    recv `shouldReturn` ("a", "b", True, "b", False, "b", "b")
+    atomically (set b "a")
+    recv `shouldReturn` ("a", "a", True, "a", True, "a", "a")
+    atomically (set c False)
+    recv `shouldReturn` ("a", "a", False, "a", True, "a", "a")
+    atomically (set a "b")
+    recv `shouldReturn` ("b", "a", False, "b", False, "a", "b")
+      
   it "nests combines right" do
     (a, b, c, d, e, f, g) <- atomically do
       a <- incremental "X"

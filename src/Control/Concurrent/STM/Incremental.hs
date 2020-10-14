@@ -1,3 +1,4 @@
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE BlockArguments #-}
@@ -53,6 +54,7 @@ module Control.Concurrent.STM.Incremental
 , map
 , combine
 , choose
+, immutable
 ) where
 
 import Prelude hiding (read, map)
@@ -135,6 +137,12 @@ combine f (Incremental ref updateRef) (Incremental ref' updateRef') = do
     newUpdate c
   pure (Incremental newRef newUpdateRef)
 
+-- | Sometimes, we need to consider an @'Incremental' 'Mutable'@ in
+-- a setting alongside @'Incremental' 'Immutable'@ values, unifying their
+-- type. One example where this is common is in 'choose'. This is a convenience function allowing you to do that.
+immutable :: Incremental 'Mutable b -> Incremental 'Immutable b
+immutable Incremental{..} = Incremental{..}
+
 -- | Chooses an incremental computation depending on the value inside of another
 -- one. When using 'map' and 'combine', you are constructing
 -- a static dependency graph, whereas when you use this function you are
@@ -164,17 +172,19 @@ choose (Incremental ref updateRef) f = do
     if ref'' /= currentRef then do
       b <- readTVar ref''
       writeTVar newRef b
+      newUpdate <- readTVar newUpdateRef
+      newUpdate b
       if not (ref'' `elem` pastRefs) then do
         update'' <- readTVar updateRef''
         writeTVar updateRef'' \b -> do
           update'' b
           (tvar, _tvars) <- readTVar updateFromWhichRef
-          if tvar == ref'' then writeTVar newRef b
+          if tvar == ref'' then do
+            writeTVar newRef b
+            newUpdate <- readTVar newUpdateRef
+            newUpdate b
           else pure ()
         writeTVar updateFromWhichRef (ref'', ref'' : pastRefs)
-      else
-        pure ()
-      newUpdate <- readTVar newUpdateRef
-      newUpdate b
+      else writeTVar updateFromWhichRef (ref'', pastRefs)
     else pure ()
   pure (Incremental newRef newUpdateRef)
