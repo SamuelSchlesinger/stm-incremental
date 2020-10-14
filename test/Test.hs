@@ -44,14 +44,14 @@ main = hspec . describe "stm-incremental" $ do
     recv `shouldReturn` ("a", "a", False, "a", True, "a", "a", False)
     atomically (set a "b")
     recv `shouldReturn` ("b", "a", False, "b", False, "a", "b", False)
-    atomically (readTVar aHist) `shouldReturn` ["b", "a"]
-    atomically (readTVar bHist) `shouldReturn` ["a", "b"]
-    atomically (readTVar cHist) `shouldReturn` [False, True]
-    atomically (readTVar dHist) `shouldReturn` ["b", "a", "a", "b"]
-    atomically (readTVar eHist) `shouldReturn` [False, True, True, False]
-    atomically (readTVar fHist) `shouldReturn` ["a", "a", "a", "b"]
-    atomically (readTVar gHist) `shouldReturn` ["b", "a", "b"]
-    atomically (readTVar hHist) `shouldReturn` [False, True, False, True, False]
+    atomically aHist `shouldReturn` ["b", "a"]
+    atomically bHist `shouldReturn` ["a", "b"]
+    atomically cHist `shouldReturn` [False, True]
+    atomically dHist `shouldReturn` ["b", "a", "a", "b"]
+    atomically eHist `shouldReturn` [False, True, True, False]
+    atomically fHist `shouldReturn` ["a", "a", "a", "b"]
+    atomically gHist `shouldReturn` ["b", "a", "b"]
+    atomically hHist `shouldReturn` [False, True, False, True, False]
   it "nests combines right" do
     (a, aHist, b, bHist, c, cHist, d, dHist, e, eHist, f, fHist, g, gHist) <- atomically do
       a <- incremental "X"
@@ -77,13 +77,13 @@ main = hspec . describe "stm-incremental" $ do
     recv `shouldReturn` ("A", "D", "Z", "AZ", "ZD", "AZZD", "AAZZD")
     atomically (set c "P")
     recv `shouldReturn` ("A", "D", "P", "AP", "PD", "APPD", "AAPPD")
-    atomically (readTVar aHist) `shouldReturn` ["A","X"]
-    atomically (readTVar bHist) `shouldReturn` ["D","O"]
-    atomically (readTVar cHist) `shouldReturn` ["P", "Z"]
-    atomically (readTVar dHist) `shouldReturn` ["AP","AZ","XZ"]
-    atomically (readTVar eHist) `shouldReturn` ["PD","ZD","ZO"]
-    atomically (readTVar fHist) `shouldReturn` ["APPD","APZD","AZZD","AZZO","XZZO"]
-    atomically (readTVar gHist) `shouldReturn` ["AAPPD","AAPZD","AAZZD","AAZZO","AAZZO","XXZZO"]
+    atomically aHist `shouldReturn` ["A","X"]
+    atomically bHist `shouldReturn` ["D","O"]
+    atomically cHist `shouldReturn` ["P", "Z"]
+    atomically dHist `shouldReturn` ["AP","AZ","XZ"]
+    atomically eHist `shouldReturn` ["PD","ZD","ZO"]
+    atomically fHist `shouldReturn` ["APPD","APZD","AZZD","AZZO","XZZO"]
+    atomically gHist `shouldReturn` ["AAPPD","AAPZD","AAZZD","AAZZO","AAZZO","XXZZO"]
   it "nests maps right" do
     (a, aHist, b, bHist, c, cHist, d, dHist) <- atomically do
       a <- incremental 1
@@ -99,10 +99,10 @@ main = hspec . describe "stm-incremental" $ do
     recv `shouldReturn` (1, 2, 3, 4)
     atomically (set a 101)
     recv `shouldReturn` (101, 102, 103, 104) 
-    atomically (readTVar aHist) `shouldReturn` [101,1]
-    atomically (readTVar bHist) `shouldReturn` [102, 2]
-    atomically (readTVar cHist) `shouldReturn` [103, 3]
-    atomically (readTVar dHist) `shouldReturn` [104, 4]
+    atomically aHist `shouldReturn` [101,1]
+    atomically bHist `shouldReturn` [102, 2]
+    atomically cHist `shouldReturn` [103, 3]
+    atomically dHist `shouldReturn` [104, 4]
   it "binds alright" do
     (x, xHist, y, yHist, z, zHist, a, aHist) <- atomically do
       x <- incremental 100
@@ -128,10 +128,10 @@ main = hspec . describe "stm-incremental" $ do
     recv `shouldReturn` (1000, 500, False, 1000) 
     atomically (set z True)
     recv `shouldReturn` (1000, 500, True, 500)
-    atomically (readTVar xHist) `shouldReturn` [1000,0,100]
-    atomically (readTVar yHist) `shouldReturn` [500, 100, 200] 
-    atomically (readTVar zHist) `shouldReturn` [True, False, True]
-    atomically (readTVar aHist) `shouldReturn` [500,1000,0,100,200]
+    atomically xHist `shouldReturn` [1000,0,100]
+    atomically yHist `shouldReturn` [500, 100, 200] 
+    atomically zHist `shouldReturn` [True, False, True]
+    atomically aHist `shouldReturn` [500,1000,0,100,200]
   it "maps and combines alright" do
     (x, y, z) <- atomically do
       x <- incremental 100
@@ -155,9 +155,9 @@ main = hspec . describe "stm-incremental" $ do
     recv `shouldReturn` ("Heya", "Samuel", "Heya, Samuel")
     atomically (set x "Hello")
     recv `shouldReturn` ("Hello", "Samuel", "Hello, Samuel")
-    atomically (readTVar xHistory) `shouldReturn` ["Hello", "Heya"]
-    atomically (readTVar yHistory) `shouldReturn` ["Samuel"]
-    atomically (readTVar zHistory) `shouldReturn` ["Hello, Samuel", "Heya, Samuel"]
+    atomically xHistory `shouldReturn` ["Hello", "Heya"]
+    atomically yHistory `shouldReturn` ["Samuel"]
+    atomically zHistory `shouldReturn` ["Hello, Samuel", "Heya, Samuel"]
   it "maps alright" do
     (x, xHistory, y, yHistory) <- atomically do
       x <- incremental "Hello, world"
@@ -170,8 +170,8 @@ main = hspec . describe "stm-incremental" $ do
     atomically (set x "Wot, m8?")
     atomically (set x "Wot, m8?")
     recv `shouldReturn` ("Wot, m8?", "WOT, M8?!")
-    atomically (readTVar xHistory) `shouldReturn` ["Wot, m8?", "Wot, m8?", "Hello, world"]
-    atomically (readTVar yHistory) `shouldReturn` ["WOT, M8?!", "WOT, M8?!", "HELLO, WORLD!"]
+    atomically xHistory `shouldReturn` ["Wot, m8?", "Wot, m8?", "Hello, world"]
+    atomically yHistory `shouldReturn` ["WOT, M8?!", "WOT, M8?!", "HELLO, WORLD!"]
   describe "with eq operations" do
     it "nests binds right" do
       (a, aHist, b, bHist, c, cHist, d, dHist, e, eHist, f, fHist, g, gHist, h, hHist) <- atomically do
@@ -204,14 +204,14 @@ main = hspec . describe "stm-incremental" $ do
       recv `shouldReturn` ("a", "a", False, "a", True, "a", "a", False)
       atomically (setEq a "b")
       recv `shouldReturn` ("b", "a", False, "b", False, "a", "b", False)
-      atomically (readTVar aHist) `shouldReturn` ["b", "a"]
-      atomically (readTVar bHist) `shouldReturn` ["a", "b"]
-      atomically (readTVar cHist) `shouldReturn` [False, True]
-      atomically (readTVar dHist) `shouldReturn` ["b", "a", "a", "b"]
-      atomically (readTVar eHist) `shouldReturn` [False,True,False]
-      atomically (readTVar fHist) `shouldReturn` ["a", "a", "b"]
-      atomically (readTVar gHist) `shouldReturn` ["b", "a", "b"]
-      atomically (readTVar hHist) `shouldReturn` [False, True, False, True, False]
+      atomically aHist `shouldReturn` ["b", "a"]
+      atomically bHist `shouldReturn` ["a", "b"]
+      atomically cHist `shouldReturn` [False, True]
+      atomically dHist `shouldReturn` ["b", "a", "a", "b"]
+      atomically eHist `shouldReturn` [False,True,False]
+      atomically fHist `shouldReturn` ["a", "a", "b"]
+      atomically gHist `shouldReturn` ["b", "a", "b"]
+      atomically hHist `shouldReturn` [False, True, False, True, False]
     it "nests combines right" do
       (a, aHist, b, bHist, c, cHist, d, dHist, e, eHist, f, fHist, g, gHist) <- atomically do
         a <- incremental "X"
@@ -237,13 +237,13 @@ main = hspec . describe "stm-incremental" $ do
       recv `shouldReturn` ("A", "D", "Z", "AZ", "ZD", "AZZD", "AAZZD")
       atomically (setEq c "P")
       recv `shouldReturn` ("A", "D", "P", "AP", "PD", "APPD", "AAPPD")
-      atomically (readTVar aHist) `shouldReturn` ["A","X"]
-      atomically (readTVar bHist) `shouldReturn` ["D","O"]
-      atomically (readTVar cHist) `shouldReturn` ["P", "Z"]
-      atomically (readTVar dHist) `shouldReturn` ["AP","AZ","XZ"]
-      atomically (readTVar eHist) `shouldReturn` ["PD","ZD","ZO"]
-      atomically (readTVar fHist) `shouldReturn` ["APPD","APZD","AZZD","AZZO","XZZO"]
-      atomically (readTVar gHist) `shouldReturn` ["AAPPD","AAPZD","AAZZD","AAZZO","XXZZO"]
+      atomically aHist `shouldReturn` ["A","X"]
+      atomically bHist `shouldReturn` ["D","O"]
+      atomically cHist `shouldReturn` ["P", "Z"]
+      atomically dHist `shouldReturn` ["AP","AZ","XZ"]
+      atomically eHist `shouldReturn` ["PD","ZD","ZO"]
+      atomically fHist `shouldReturn` ["APPD","APZD","AZZD","AZZO","XZZO"]
+      atomically gHist `shouldReturn` ["AAPPD","AAPZD","AAZZD","AAZZO","XXZZO"]
     it "nests maps right" do
       (a, aHist, b, bHist, c, cHist, d, dHist) <- atomically do
         a <- incremental 1
@@ -259,10 +259,10 @@ main = hspec . describe "stm-incremental" $ do
       recv `shouldReturn` (1, 2, 3, 4)
       atomically (setEq a 101)
       recv `shouldReturn` (101, 102, 103, 104) 
-      atomically (readTVar aHist) `shouldReturn` [101,1]
-      atomically (readTVar bHist) `shouldReturn` [102, 2]
-      atomically (readTVar cHist) `shouldReturn` [103, 3]
-      atomically (readTVar dHist) `shouldReturn` [104, 4]
+      atomically aHist `shouldReturn` [101,1]
+      atomically bHist `shouldReturn` [102, 2]
+      atomically cHist `shouldReturn` [103, 3]
+      atomically dHist `shouldReturn` [104, 4]
     it "binds alright" do
       (x, xHist, y, yHist, z, zHist, a, aHist) <- atomically do
         x <- incremental 100
@@ -288,10 +288,10 @@ main = hspec . describe "stm-incremental" $ do
       recv `shouldReturn` (1000, 500, False, 1000) 
       atomically (setEq z True)
       recv `shouldReturn` (1000, 500, True, 500)
-      atomically (readTVar xHist) `shouldReturn` [1000,0,100]
-      atomically (readTVar yHist) `shouldReturn` [500, 100, 200] 
-      atomically (readTVar zHist) `shouldReturn` [True, False, True]
-      atomically (readTVar aHist) `shouldReturn` [500,1000,0,100,200]
+      atomically xHist `shouldReturn` [1000,0,100]
+      atomically yHist `shouldReturn` [500, 100, 200] 
+      atomically zHist `shouldReturn` [True, False, True]
+      atomically aHist `shouldReturn` [500,1000,0,100,200]
     it "maps and combines alright" do
       (x, y, z) <- atomically do
         x <- incremental 100
@@ -315,9 +315,9 @@ main = hspec . describe "stm-incremental" $ do
       recv `shouldReturn` ("Heya", "Samuel", "Heya, Samuel")
       atomically (setEq x "Hello")
       recv `shouldReturn` ("Hello", "Samuel", "Hello, Samuel")
-      atomically (readTVar xHistory) `shouldReturn` ["Hello", "Heya"]
-      atomically (readTVar yHistory) `shouldReturn` ["Samuel"]
-      atomically (readTVar zHistory) `shouldReturn` ["Hello, Samuel", "Heya, Samuel"]
+      atomically xHistory `shouldReturn` ["Hello", "Heya"]
+      atomically yHistory `shouldReturn` ["Samuel"]
+      atomically zHistory `shouldReturn` ["Hello, Samuel", "Heya, Samuel"]
     it "maps alright" do
       (x, xHistory, y, yHistory) <- atomically do
         x <- incremental "Hello, world"
@@ -330,15 +330,5 @@ main = hspec . describe "stm-incremental" $ do
       atomically (setEq x "Wot, m8?")
       atomically (setEq x "Wot, m8?")
       recv `shouldReturn` ("Wot, m8?", "WOT, M8?!")
-      atomically (readTVar xHistory) `shouldReturn` ["Wot, m8?", "Hello, world"]
-      atomically (readTVar yHistory) `shouldReturn` ["WOT, M8?!", "HELLO, WORLD!"]
-
-history :: Incremental m b -> STM (TVar [b])
-history i = do
-  b <- observe i
-  h <- newTVar [b]
-  onUpdate i \b -> do
-    bs <- readTVar h
-    writeTVar h (b : bs)
-  pure h
-
+      atomically xHistory `shouldReturn` ["Wot, m8?", "Hello, world"]
+      atomically yHistory `shouldReturn` ["WOT, M8?!", "HELLO, WORLD!"]

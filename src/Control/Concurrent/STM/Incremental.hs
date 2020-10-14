@@ -60,6 +60,7 @@ module Control.Concurrent.STM.Incremental
 , chooseEq
 , immutable
 , onUpdate
+, history
 ) where
 
 import Prelude hiding (read, map)
@@ -338,18 +339,18 @@ chooseEq (Incremental ref updateRef) f = do
 
 -- | Add monitoring hooks which can do arbitrary actions in 'STM' with the
 -- changed value whenever this 'Incremental' is updated. One useful example
--- of this is used for testing this module, recording the history of an
+-- of this is used for testing this module, recording the 'history' of an
 -- 'Incremental' computation:
 --
 -- @
--- history :: Incremental m b -> STM (TVar [b])
+-- history :: Incremental m b -> STM (STM [b])
 -- history i = do
 --   x <- observe i
 --   h <- newTVar [x]
 --   onUpdate i \b -> do
 --     bs <- readTVar h
 --     writeTVar h (b : bs)
---   pure h
+--   pure (readTVar h)
 -- @
 onUpdate :: Incremental m b -> (b -> STM ()) -> STM ()
 onUpdate (Incremental _ref updateRef) monitoring = do
@@ -358,3 +359,13 @@ onUpdate (Incremental _ref updateRef) monitoring = do
     update b
     monitoring b
     
+-- | Instruments the given 'Incremental' with functionality to save the
+-- history of its values. This is useful for testing.
+history :: Incremental m b -> STM (STM [b])
+history i = do
+  x <- observe i
+  h <- newTVar [x]
+  onUpdate i \b -> do
+    bs <- readTVar h
+    writeTVar h (b : bs)
+  pure (readTVar h)
