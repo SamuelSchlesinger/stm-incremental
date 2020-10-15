@@ -1,5 +1,7 @@
 # stm-incremental
 
+[![Hackage](https://img.shields.io/hackage/v/stm-incremental.svg)](https://hackage.haskell.org/package/stm-incremental)
+
 This library is meant to expose an interface for incremental computation
 using software transactional memory in Haskell.
 
