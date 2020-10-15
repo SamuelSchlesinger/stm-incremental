@@ -23,6 +23,7 @@ main = do
     b <- incremental 1
     c <- map (+ 1) b
     d <- combine (+) c b
+    pure (a, b, c, d)
 
   guard =<< (atomically $ do
     (== 3) <$> observe d)
