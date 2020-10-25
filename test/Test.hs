@@ -2,7 +2,6 @@
 {-# LANGUAGE BlockArguments #-}
 module Main where
 
-import Prelude hiding (map)
 import Data.Bool (bool)
 import Data.Char (toUpper)
 
@@ -23,7 +22,7 @@ main = hspec . describe "stm-incremental" $ do
       cHist <- history c
       d <- choose c (bool a b)
       dHist <- history d
-      e <- map (== "a") d
+      e <- imap (== "a") d
       eHist <- history e
       f <- choose e (bool (immutable b) d)
       fHist <- history f
@@ -84,15 +83,15 @@ main = hspec . describe "stm-incremental" $ do
     atomically eHist `shouldReturn` ["PD","ZD","ZO"]
     atomically fHist `shouldReturn` ["APPD","APZD","AZZD","AZZO","XZZO"]
     atomically gHist `shouldReturn` ["AAPPD","AAPZD","AAZZD","AAZZO","AAZZO","XXZZO"]
-  it "nests maps right" do
+  it "nests imaps right" do
     (a, aHist, b, bHist, c, cHist, d, dHist) <- atomically do
       a <- incremental 1
       aHist <- history a
-      b <- map (+ 1) a
+      b <- imap (+ 1) a
       bHist <- history b
-      c <- map (+ 1) b
+      c <- imap (+ 1) b
       cHist <- history c
-      d <- map (+ 1) c
+      d <- imap (+ 1) c
       dHist <- history d
       pure (a, aHist, b, bHist, c, cHist, d, dHist)
     let recv = atomically ((,,,) <$> observe a <*> observe b <*> observe c <*> observe d)
@@ -132,10 +131,10 @@ main = hspec . describe "stm-incremental" $ do
     atomically yHist `shouldReturn` [500, 100, 200] 
     atomically zHist `shouldReturn` [True, False, True]
     atomically aHist `shouldReturn` [500,1000,0,100,200]
-  it "maps and combines alright" do
+  it "imaps and combines alright" do
     (x, y, z) <- atomically do
       x <- incremental 100
-      y <- map (+ 10) x
+      y <- imap (+ 10) x
       z <- combine (+) x y
       pure (x, y, z)
     let recv = atomically ((,,) <$> observe x <*> observe y <*> observe z)
@@ -158,11 +157,11 @@ main = hspec . describe "stm-incremental" $ do
     atomically xHistory `shouldReturn` ["Hello", "Heya"]
     atomically yHistory `shouldReturn` ["Samuel"]
     atomically zHistory `shouldReturn` ["Hello, Samuel", "Heya, Samuel"]
-  it "maps alright" do
+  it "imaps alright" do
     (x, xHistory, y, yHistory) <- atomically do
       x <- incremental "Hello, world"
       xHistory <- history x
-      y <- map ((<> "!") . fmap toUpper) x
+      y <- imap ((<> "!") . fmap toUpper) x
       yHistory <- history y
       pure (x, xHistory, y, yHistory)
     let recv = atomically ((,) <$> observe x <*> observe y) 
@@ -183,7 +182,7 @@ main = hspec . describe "stm-incremental" $ do
         cHist <- history c
         d <- chooseEq c (bool a b)
         dHist <- history d
-        e <- mapEq (== "a") d
+        e <- imapEq (== "a") d
         eHist <- history e
         f <- chooseEq e (bool (immutable b) d)
         fHist <- history f
@@ -244,15 +243,15 @@ main = hspec . describe "stm-incremental" $ do
       atomically eHist `shouldReturn` ["PD","ZD","ZO"]
       atomically fHist `shouldReturn` ["APPD","APZD","AZZD","AZZO","XZZO"]
       atomically gHist `shouldReturn` ["AAPPD","AAPZD","AAZZD","AAZZO","XXZZO"]
-    it "nests maps right" do
+    it "nests imaps right" do
       (a, aHist, b, bHist, c, cHist, d, dHist) <- atomically do
         a <- incremental 1
         aHist <- history a
-        b <- mapEq (+ 1) a
+        b <- imapEq (+ 1) a
         bHist <- history b
-        c <- mapEq (+ 1) b
+        c <- imapEq (+ 1) b
         cHist <- history c
-        d <- mapEq (+ 1) c
+        d <- imapEq (+ 1) c
         dHist <- history d
         pure (a, aHist, b, bHist, c, cHist, d, dHist)
       let recv = atomically ((,,,) <$> observe a <*> observe b <*> observe c <*> observe d)
@@ -292,10 +291,10 @@ main = hspec . describe "stm-incremental" $ do
       atomically yHist `shouldReturn` [500, 100, 200] 
       atomically zHist `shouldReturn` [True, False, True]
       atomically aHist `shouldReturn` [500,1000,0,100,200]
-    it "maps and combines alright" do
+    it "imaps and combines alright" do
       (x, y, z) <- atomically do
         x <- incremental 100
-        y <- mapEq (+ 10) x
+        y <- imapEq (+ 10) x
         z <- combineEq (+) x y
         pure (x, y, z)
       let recv = atomically ((,,) <$> observe x <*> observe y <*> observe z)
@@ -318,11 +317,11 @@ main = hspec . describe "stm-incremental" $ do
       atomically xHistory `shouldReturn` ["Hello", "Heya"]
       atomically yHistory `shouldReturn` ["Samuel"]
       atomically zHistory `shouldReturn` ["Hello, Samuel", "Heya, Samuel"]
-    it "maps alright" do
+    it "imaps alright" do
       (x, xHistory, y, yHistory) <- atomically do
         x <- incremental "Hello, world"
         xHistory <- history x
-        y <- mapEq ((<> "!") . fmap toUpper) x
+        y <- imapEq ((<> "!") . fmap toUpper) x
         yHistory <- history y
         pure (x, xHistory, y, yHistory)
       let recv = atomically ((,) <$> observe x <*> observe y) 

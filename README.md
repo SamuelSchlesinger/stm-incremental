@@ -21,9 +21,9 @@ main = do
   atomically (observe greeting) >>= print
 ```
 
-There are three operations, `map`, `combine`, and `choose`. They sort of
+There are three operations, `imap`, `combine`, and `choose`. They sort of
 correspond to the operations of `fmap`, `liftA2`, and `(>>=)`, but not exactly,
-and it isn't really worth belaboring that point if it isn't clear. `map` allows
+and it isn't really worth belaboring that point if it isn't clear. `imap` allows
 you to construct an incremental computation depending on one other, which only
 ever gets updated when this single dependency does. `combine` allows you to
 construct an incremental computation depending on two others, which gets updated

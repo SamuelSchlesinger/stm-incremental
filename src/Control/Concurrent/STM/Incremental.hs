@@ -21,7 +21,7 @@ main = do
   (a, b, c, d) <- atomically $ do
     a <- incremental 0
     b <- incremental 1
-    c <- map (+ 1) b
+    c <- imap (+ 1) b
     d <- combine (+) c b
     pure (a, b, c, d)
 
@@ -42,7 +42,7 @@ which we can set new values for are the leaves of the computation, constructed
 with 'incremental'. This is this way because we don't want to mutate 'Incremental's
 downstream of dependencies, because then we cannot know that those computations
 remain consistent. Most operations are polymorphic over 'Mutable' and 'Immutable'
-'Incremental's, but 'map', 'combine', and 'choose' all produce an @'Incremental' 'Immutable'@,
+'Incremental's, but 'imap', 'combine', and 'choose' all produce an @'Incremental' 'Immutable'@,
 whereas 'incremental' produces a @'Incremental' 'Mutable'@.
 
 -}
@@ -53,8 +53,8 @@ module Control.Concurrent.STM.Incremental
 , observe
 , set
 , setEq
-, map
-, mapEq
+, imap
+, imapEq
 , combine
 , combineEq
 , choose
@@ -64,8 +64,7 @@ module Control.Concurrent.STM.Incremental
 , history
 ) where
 
-import Prelude hiding (read, map)
-import Data.Bool (bool)
+import Prelude
 
 import Control.Concurrent.STM
 import Control.Monad (when)
@@ -106,7 +105,9 @@ data Incremental (mutability :: Mutability) a = Incremental
 -- precisely because it is trivial, as modifications to anything else
 -- cannot cause it to be modified. Thus, we can change it willy nilly
 -- without fear that we've invalidated someone else's changes to it.
-incremental :: a -> STM (Incremental 'Mutable a)
+incremental
+  :: a
+  -> STM (Incremental 'Mutable a)
 incremental a = do
   ref <- newTVar a
   Incremental ref <$> newTVar (const (pure ()))
@@ -114,8 +115,11 @@ incremental a = do
 -- | Create an incrementally mapped computation, producing an immutable
 -- incremental computation that will always contain the function mapped
 -- over the value inside of the original computation.
-map :: (a -> b) -> Incremental m a -> STM (Incremental 'Immutable b)
-map f (Incremental ref updateRef) = do
+imap
+  :: (a -> b) 
+  -> Incremental m a
+  -> STM (Incremental 'Immutable b)
+imap f (Incremental ref updateRef) = do
   newRef <- readTVar ref >>= newTVar . f
   newUpdateRef <- newTVar (const (pure ()))
   update <- readTVar updateRef
@@ -130,8 +134,12 @@ map f (Incremental ref updateRef) = do
 -- | Create an incrementally mapped computation, producing an immutable
 -- incremental computation that will always contain the function mapped
 -- over the value inside of the original computation.
-mapEq :: Eq b => (a -> b) -> Incremental m a -> STM (Incremental 'Immutable b)
-mapEq f (Incremental ref updateRef) = do
+imapEq
+  :: Eq b
+  => (a -> b)
+  -> Incremental m a
+  -> STM (Incremental 'Immutable b)
+imapEq f (Incremental ref updateRef) = do
   newRef <- readTVar ref >>= newTVar . f
   newUpdateRef <- newTVar (const (pure ()))
   update <- readTVar updateRef
@@ -146,7 +154,10 @@ mapEq f (Incremental ref updateRef) = do
   pure (Incremental newRef newUpdateRef)
 
 -- | Sets the value of a mutable incremental computation.
-set :: Incremental 'Mutable a -> a -> STM ()
+set
+  :: Incremental 'Mutable a
+  -> a
+  -> STM ()
 set incr a = do
   writeTVar (ref incr) a
   update <- readTVar (updateRef incr)
@@ -155,7 +166,11 @@ set incr a = do
 -- | Sets the value of a mutable incremental computation, with the added
 -- optimization that if the value is equal to the old one, this does not
 -- update the dependents of this 'Incremental' value.
-setEq :: Eq a => Incremental 'Mutable a -> a -> STM ()
+setEq
+  :: Eq a
+  => Incremental 'Mutable a
+  -> a
+  -> STM ()
 setEq incr a = do
   a' <- readTVar (ref incr)
   when (a' /= a) do
@@ -164,14 +179,20 @@ setEq incr a = do
     update a
 
 -- | Observes the present value of any incremental computation.
-observe :: Incremental m a -> STM a
+observe
+  :: Incremental m a
+  -> STM a
 observe = readTVar . ref
 
 -- | Combines the results of two incremental computation into a third,
 -- producing an immutable incremental computation that will always contain
 -- the function mapped over both of the values inside of the respective
 -- incremental computations.
-combine :: (a -> b -> c) -> Incremental m a -> Incremental m' b -> STM (Incremental 'Immutable c)
+combine
+  :: (a -> b -> c)
+  -> Incremental m a
+  -> Incremental m' b
+  -> STM (Incremental 'Immutable c)
 combine f (Incremental ref updateRef) (Incremental ref' updateRef') = do
   a <- readTVar ref
   b <- readTVar ref'
@@ -198,7 +219,12 @@ combine f (Incremental ref updateRef) (Incremental ref' updateRef') = do
 -- | Like 'combine', but with the added optimization that if the value
 -- computed is equal to the old one, it will not propagate the update
 -- through any further.
-combineEq :: Eq c => (a -> b -> c) -> Incremental m a -> Incremental m' b -> STM (Incremental 'Immutable c)
+combineEq
+  :: Eq c
+  => (a -> b -> c)
+  -> Incremental m a
+  -> Incremental m' b
+  -> STM (Incremental 'Immutable c)
 combineEq f (Incremental ref updateRef) (Incremental ref' updateRef') = do
   a <- readTVar ref
   b <- readTVar ref'
@@ -247,7 +273,9 @@ combineEq f (Incremental ref updateRef) (Incremental ref' updateRef') = do
 -- z <- choose y (bool y (immutable x))
 -- ...
 -- @
-immutable :: Incremental 'Mutable b -> Incremental 'Immutable b
+immutable
+  :: Incremental 'Mutable b
+  -> Incremental 'Immutable b
 immutable Incremental{..} = Incremental{..}
 
 -- | Chooses an incremental computation depending on the value inside of another
@@ -255,7 +283,10 @@ immutable Incremental{..} = Incremental{..}
 -- a static dependency graph, whereas when you use this function you are
 -- making it dynamic, the linkages depending on the actual contents of the
 -- incremental computation nodes.
-choose :: Incremental m' a -> (a -> Incremental m b) -> STM (Incremental 'Immutable b)
+choose
+  :: Incremental m' a
+  -> (a -> Incremental m b)
+  -> STM (Incremental 'Immutable b)
 choose (Incremental ref updateRef) f = do
   a <- readTVar ref
   let Incremental ref' updateRef' = f a
@@ -295,8 +326,11 @@ choose (Incremental ref updateRef) f = do
 
 -- | Like 'choose', but with the added optimization that we do not
 -- propagate changes when we don't have to in a similar way to 'setEq',
--- 'combineEq', and 'mapEq'.
-chooseEq :: Eq b => Incremental m' a -> (a -> Incremental m b) -> STM (Incremental 'Immutable b)
+-- 'combineEq', and 'imapEq'.
+chooseEq :: Eq b
+  => Incremental m' a
+  -> (a -> Incremental m b)
+  -> STM (Incremental 'Immutable b)
 chooseEq (Incremental ref updateRef) f = do
   a <- readTVar ref
   let Incremental ref' updateRef' = f a
@@ -353,7 +387,10 @@ chooseEq (Incremental ref updateRef) f = do
 --     writeTVar h (b : bs)
 --   pure (readTVar h)
 -- @
-onUpdate :: Incremental m b -> (b -> STM ()) -> STM ()
+onUpdate
+  :: Incremental m b
+  -> (b -> STM ())
+  -> STM ()
 onUpdate (Incremental _ref updateRef) monitoring = do
   update <- readTVar updateRef
   writeTVar updateRef \b -> do
@@ -362,7 +399,9 @@ onUpdate (Incremental _ref updateRef) monitoring = do
     
 -- | Instruments the given 'Incremental' with functionality to save the
 -- history of its values. This is useful for testing.
-history :: Incremental m b -> STM (STM [b])
+history
+  :: Incremental m b
+  -> STM (STM [b])
 history i = do
   x <- observe i
   h <- newTVar [x]
