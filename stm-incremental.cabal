@@ -13,7 +13,7 @@ maintainer:          sgschlesinger@gmail.com
 copyright:           2019 Samuel Schlesinger
 category:            Control, Concurrency
 extra-source-files:  CHANGELOG.md, README.md
-tested-with:         GHC ==8.6.5 || ==8.8.4 || ==8.10.2
+tested-with:         GHC ==8.6.5 || ==8.8.4 || ==8.10.2 || ==9.6.7
 
 source-repository head
   type: git 
